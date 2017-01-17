@@ -1,0 +1,87 @@
+#mysql not presently set up. GRUB error being thrown at the end of installation.
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "hashicorp/precise64"
+  config.vm.network "forwarded_port", guest: 80, host: 8080
+  config.vm.network "private_network", ip: "192.168.33.10"
+  config.vm.network "public_network"
+
+  config.vm.synced_folder "/Users/Trent/Desktop/Vagrant-PHP/PDF-CLI-Vagrant", "/var/www/",
+  id: "mainrepo",
+  owner: "vagrant", dmode: "777", fmode: "664"
+  config.vm.synced_folder "/Users/Trent/Desktop/Vagrant-PHP/Vagrant/SQL", "/home/vagrant/sqldump/",
+  id: "sqldump",
+  owner: "vagrant", dmode: "777", fmode: "664"
+
+  config.vm.define "TrentOpsClickTest" do |config|
+    config.vm.provider :digital_ocean do |provider, override|
+      override.ssh.private_key_path = "~/.ssh/id_rsa"
+      override.vm.box = "digital_ocean"
+      override.vm.box_url = "https://github.com/devopsgroup-io/vagrant-digitalocean/raw/master/box/digital_ocean.box"
+      #provider.token = '163543f40cee16a4675d3c62ef47c9d50b6ae8821d5e14eba402be45ef37c762'
+      provider.token = "97b9e8bf6578154cf267dfc1db5b6f23078e8081059c33688123969beb432eb8"
+      provider.image = "ubuntu-14-04-x64"
+      provider.region = "nyc1"
+      #Below, default size for digital ocean but specifying anyways
+      provider.size = "512mb"
+    end
+
+    config.vm.provider :virtualbox do |vb|
+      vb.memory = 2046
+    end
+  end
+
+config.vm.provision "shell", inline: <<-SHELL
+sudo apt-get -y update
+sudo apt-get -y install apache2
+sudo apt-get -y upgrade
+sudo apt-get -y install python
+sudo apt-get -y install curl
+sudo apt-get -y install zip
+sudo apt-get -y install unzip
+
+echo "###########################"
+echo "About to change permissions"
+echo "###########################"
+sudo chown -R vagrant /etc/apache2/conf.d/security
+sudo chown -R vagrant /etc/apache2/conf.d/
+sudo chown -R vagrant /etc/apache2/apache2.conf
+sudo chmod -r /tmp
+echo "###############################"
+echo "Should have changed permissions"
+echo "###############################"
+
+sudo rm -r /etc/apache2/conf.d/security
+
+echo "ServerName localhost" >> /etc/apache2/conf.d/security
+
+sudo service apache2 restart
+
+sudo chown -R vagrant /var/www
+
+sudo apt-get -y install php5 libapache2-mod-php5 php5-mcrypt
+sudo service apache2 restart
+
+sudo apt-get -y install git
+sudo service apache2 restart
+
+sudo debconf-set-selections <<< 'mysql-server-5.5 mysql-server/root_password password rootpass'
+sudo debconf-set-selections <<< 'mysql-server-5.5 mysql-server/root_password_again password rootpass'
+sudo apt-get -y install mysql-server libapache2-mod-auth-mysql php5-mysql
+sudo service apache2 restart
+
+
+mkdir /home/vagrant/ip
+/sbin/ifconfig eth0 | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}' > /home/vagrant/ip/ip.txt
+
+SHELL
+
+#Lines taken out to run this version instead of a different one
+#export IP="$(cat /home/vagrant/ip/ip.txt)"
+#echo $IP
+#sudo echo "Listen $IP:80" >> /etc/apache2/apache2.conf
+
+#sudo rm -r /var/www/index.html
+#sudo git clone https://github.com/TrentonMay/DWP.git /var/www/
+
+end
